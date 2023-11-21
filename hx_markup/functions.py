@@ -24,11 +24,12 @@ import secrets
 from collections.abc import Sequence
 from dataclasses import fields
 from functools import partial
-from typing import Any, Callable, get_args, get_origin, Iterable, Literal, Optional, overload, TypeVar
+from typing import Any, get_args, get_origin, Iterable, Literal, Optional, overload, TypeVar
 
-
+from hx_markup import config
 
 T = TypeVar('T')
+TType = TypeVar('TType', bound=type)
 
 def bool_to_portuguese(v: bool) -> str:
     return 'sim' if v else 'não'
@@ -72,10 +73,6 @@ def find_digits(string: str) -> list[str]:
 
 def remove_extra_whitespaces(string: str) -> str:
     return re.sub(r'(\s+)', ' ', string).strip()
-
-
-
-
 
 
 def slug_to_cls_name(slug: str):
@@ -130,15 +127,16 @@ def join(data: dict, sep: str, junction: str, boundary: str, underscored: bool, 
 def join(data: Sequence, sep: str) -> str:...
 
 
-def join(data: list | dict, sep: str = None, junction: str = "=", boundary: str ='"', underscored: bool = False, prefix: str = None) -> str:
+def join(data: list | dict, sep: str = None, junction: str = "=", boundary: str ='"', underscored: bool = False, prefix: str = None, before: str = '', after: str = '') -> str:
+    wrapper = lambda x: f'{before}{x}{after}'
     if isinstance(data, dict):
         sep = sep or ', '
         prefixed = lambda x: f'{prefix}{x}' if prefix else x
         key = lambda x: prefixed(x).replace('-', '_') if underscored else prefixed(x).replace('_', '-')
         value = lambda x: f'{boundary}{x}{boundary}'
-        return (sep or ', ').join([junction.join([key(k), value(v)])  for k, v in data.items() if v])
+        return wrapper((sep or ', ').join([junction.join([key(k), value(v)])  for k, v in data.items() if v]))
     else:
-        return (sep or ' ').join([str(i) for i in data if i])
+        return wrapper((sep or ' ').join([str(i) for i in data if i]))
 
 
 def primary_type(annotation: Any):
@@ -151,7 +149,7 @@ def primary_type(annotation: Any):
         return annotation
 
 
-def filter_by_type(iterable: Iterable[T, Any], tp: tuple[type] | type):
+def filter_by_type(iterable: Iterable[T, Any], tp: TType | tuple[Any, ...]):
     return [i for i in iterable if isinstance(i, tp)]
 
 
@@ -289,17 +287,15 @@ def string_to_list(v: list[str] | str):
         return filter_not_none(v)
     return v
 
-def list_to_string(value, intersection: str = ', '):
+def list_to_string(value, sep: str = ' '):
     if isinstance(value, list):
-        return intersection.join(value)
-    return value
+        return sep.join([list_to_string(i, sep=sep) for i in value if i])
+    return value or ''
 
 def str_to_bytes(value):
     if isinstance(value, str):
         return value.encode('utf-8')
     return value
-
-
 
 
 def title_caps(string: str) -> str:
@@ -313,3 +309,68 @@ def title_caps(string: str) -> str:
                 cleaned.append(item.title())
         file.write(join(cleaned, sep=' '))
         return file.getvalue()
+
+
+def unpack_args(*args):
+    result = []
+    
+    def process(obj):
+        if isinstance(obj, Sequence) and not isinstance(obj, str):
+            for i in obj:
+                process(i)
+        else:
+            result.append(obj)
+            
+    for item in args:
+        if item:
+            process(item)
+
+    return result
+
+
+def split_words(value: str) -> list[str]:
+    if not value:
+        return []
+    elif isinstance(value, str):
+        return value.split()
+    elif isinstance(value, (list, tuple, set)):
+        return [*value]
+    
+    
+def slug_to_kebab_case(value: str) -> str:
+    return value.replace("_", "-")
+
+def kebab_to_slug_case(value: str) -> str:
+    return value.replace("-", "_")
+
+
+def join_html_keyword_attrs(data: dict) -> str:
+    return join(data, sep=" ", junction="=", boundary='"', underscored=False)
+
+def join_style_attrs(data: dict) -> str:
+    return join(data, sep="; ", junction=": ", boundary='', underscored=False)
+
+def join_html_dataset_attrs(data: dict) -> str:
+    return join({f'data-{slug_to_kebab_case(k)}': v for k, v in data.items()}, sep=" ", junction="=", boundary='"', underscored=False)
+
+
+def join_htmx_attrs(data: dict) -> str:
+    return join({f'hx-{slug_to_kebab_case(k)}': v for k, v in data.items()}, sep=" ", junction="=", boundary='"',
+                underscored=False)
+
+
+def attr_element_match(attr: str, element: str) -> bool:
+    if attr in config.GLOBAL_ATTRIBUTES:
+        return True
+    if regex:= config.HTML_NON_GLOBAL_ATTRIBUTES_REGEX.get(attr, None):
+        return True if regex.match(element) else False
+    return False
+
+def is_htmx_attr(attr: str) -> bool:
+    return attr in config.HTMX_ATTRIBUTES
+
+def is_boolean_attr(attr: str) -> bool:
+    return attr in config.BOOLEAN_ATTRIBUTES
+
+def is_global_attr(attr: str) -> bool:
+    return attr in config.GLOBAL_ATTRIBUTES
