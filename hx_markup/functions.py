@@ -360,10 +360,10 @@ def join_htmx_attrs(data: dict) -> str:
 
 
 def attr_element_match(attr: str, element: str) -> bool:
-    if attr in config.GLOBAL_ATTRIBUTES:
+    if attr.lower() in config.GLOBAL_ATTRIBUTES:
         return True
-    if regex:= config.HTML_NON_GLOBAL_ATTRIBUTES_REGEX.get(attr, None):
-        return True if regex.match(element) else False
+    if element.lower() in config.HTML_NON_GLOBAL_ATTRIBUTES_ELEMENT_MAP.get(attr.lower(), []):
+        return True
     return False
 
 def is_htmx_attr(attr: str) -> bool:

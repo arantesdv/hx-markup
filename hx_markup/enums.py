@@ -88,7 +88,7 @@ class TagEnum(namedtuple('Tag', 'tagname void unique semantic structure headonly
     MAIN = "main", False, True, False, False, False, True, False, False, False, []
     MAP = "map", False, False, False, False, False, True, False, False, False, ['name']
     MARK = "mark", False, False, False, False, False, True, False, False, True, []
-    META = "meta", True, False, False, False, True, False, True, False, False, ['charset', 'content', 'http-equiv',
+    META = "meta", True, False, False, False, True, False, True, False, False, ['charset', 'children', 'http-equiv',
                                                                                 'name']
     METER = "meter", False, False, False, False, False, True, False, False, False, ['high', 'low', 'max', 'min',
                                                                                     'optimum', 'value']
