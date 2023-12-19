@@ -71,7 +71,7 @@ GLOBAL_ATTRIBUTES = ('accesskey', 'class', 'contenteditable', 'data-*', 'dir', '
 
 BOOLEAN_ATTRIBUTES = ("allowfullscreen", "async", "autofocus", "autoplay", "checked", "controls", "default", "defer",
                       "disabled", "formnovalidate", "inert", "ismap", "itemscope", "loop", "multiple", "muted",
-                      "nomodule", "novalidate", "open", "playsinline", "readonly", "required", "reversed", "selected")
+                      "nomodule", "novalidate", "open", "playsinline", "readonly", "required", "reversed", "selected", "hidden")
 
 HTML_NON_GLOBAL_ATTRIBUTES_ELEMENT_MAP = {
         "accept": ['input'],
@@ -93,7 +93,7 @@ HTML_NON_GLOBAL_ATTRIBUTES_ELEMENT_MAP = {
         "color": ["font", "hr"],
         "cols": ["textarea"],
         "colspan": ["td", "th"],
-        "children": ["meta"],
+        "content": ["meta"],
         "controls": ["audio", "video"],
         "coords": ["area"],
         "crossorigin": ["link", "script", "audio", "img", "video"],

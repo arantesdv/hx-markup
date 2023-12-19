@@ -177,6 +177,8 @@ class Element(ChildBase, BaseElement):
     dataset: dict[str, str] | None = dataclasses.field(default_factory=dict)
     styles: dict[str, str] | None = dataclasses.field(default_factory=dict)
     children: deque[str | ElementType] | list[str | ElementType] | str | ElementType = dataclasses.field(default_factory=deque)
+    before: deque[str | ElementType] | list[str | ElementType] | str | ElementType = dataclasses.field(default_factory=deque)
+    after: deque[str | ElementType] | list[str | ElementType] | str | ElementType = dataclasses.field(default_factory=deque)
     
     def __post_init__(self):
         super().__post_init__()
@@ -187,6 +189,16 @@ class Element(ChildBase, BaseElement):
                 self.children = deque([self.children])
             elif isinstance(self.children, Sequence):
                 self.children = deque([*self.children])
+        if not isinstance(self.before, deque):
+            if isinstance(self.before, (str, ChildBase)):
+                self.before = deque([self.before])
+            elif isinstance(self.before, Sequence):
+                self.before = deque([*self.before])
+        if not isinstance(self.after, deque):
+            if isinstance(self.after, (str, ChildBase)):
+                self.after = deque([self.after])
+            elif isinstance(self.after, Sequence):
+                self.after = deque([*self.after])
         for item in self.children:
             if isinstance(item, ChildBase):
                 item._parent = self
@@ -266,24 +278,37 @@ class Element(ChildBase, BaseElement):
 
     @property
     def render_children(self):
+        is_script = lambda x: any([isinstance(x, Element) and x.tag_enum.tagname == 'script', isinstance(x, str) and x.startswith('<script')])
         with io.StringIO() as f:
             if self.tag_enum.tagname == 'script':
                 f.write(functions.join(self.children, sep="; "))
             else:
-                f.write(functions.join(self.children))
+                scripts = [i for i in self.children if is_script(i)]
+                children = [i for i in self.children if not i in scripts]
+                f.write(functions.join(children))
+                f.write(functions.join(scripts))
             return f.getvalue()
         
     def render(self) -> str:
         with io.StringIO() as f:
+            if self.before:
+                f.write(functions.join(self.before))
             f.write(f'<{self.tag_enum.tagname} {self.render_config}>')
             if not self.tag_enum.void:
                 f.write(self.render_children)
                 f.write(f'</{self.tag_enum.tagname}>')
+            if self.after:
+                f.write(functions.join(self.after))
             return f.getvalue()
             
 
 
 
 if __name__ == '__main__':
-    x = Element.create('input', '#myid .myclass required')
-    print(x)
+    b = Element('body', children=[
+            Element('script', keywords=dict(src='/teste'), booleans='defer'),
+            '<script src="/other" type="text/javascript"></script>',
+            Element('main'),
+            Element('input', 'myid', 'hidden', 'myinput other other', after='teste')
+    ])
+    print(b)
