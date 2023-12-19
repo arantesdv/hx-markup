@@ -185,6 +185,8 @@ HTML_NON_GLOBAL_ATTRIBUTES_ELEMENT_MAP = {
     
 }
 
+KEYWORD_ATTRIBUTES_LIST = [*HTML_NON_GLOBAL_ATTRIBUTES_ELEMENT_MAP.keys()]
+
 ENUMERATED_ATTRIBUTES = {
         "html": {
                 "autocomplete": ["on", "off"],

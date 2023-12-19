@@ -9,6 +9,7 @@ from typing import Optional, TypeVar
 
 from hx_markup import functions
 from hx_markup import enums
+from hx_markup import config
 
 
 @dataclasses.dataclass
@@ -243,6 +244,12 @@ class Element(ChildBase, BaseElement):
                         for k, v in self.keywords.items()
                         if k != 'id'
                         if all([not functions.is_boolean_attr(k), functions.attr_element_match(k, self.tag_enum.tagname)])}))
+            if self.extra_keywords:
+                f.write(' ')
+                f.write(functions.join_html_keyword_attrs({
+                        functions.slug_to_kebab_case(k): v
+                        for k, v in self.extra_keywords.items()
+                        if not k in ['id', 'class', *config.KEYWORD_ATTRIBUTES_LIST]}))
             if self.classlist:
                 f.write(' ')
                 f.write(f'class="{functions.join(functions.filter_uniques(self.classlist))}"')
