@@ -19,7 +19,9 @@ from hx_markup import config
 class RenderBase(ABC):
     
     def __str__(self):
-        return self.bs4.prettify()
+        if self.tag_enum.tagname == 'html':
+            return self.bs4.prettify()
+        return self.render()
     
     @abstractmethod
     def render(self) -> str:...
@@ -301,9 +303,8 @@ class Element(ElementBase):
             if self.tag_enum.tagname == 'style':
                 f.write(functions.join(self.children, sep="; ", junction=':', underscored=False, boundary=''))
             else:
-                scripts = [i for i in self.children if self._is_script(i)]
-                f.write(functions.join([i for i in self.children if not i in scripts]))
-                f.write(functions.join(scripts))
+                f.write(functions.join([i for i in self.children if not self._is_script(i)]))
+                f.write(functions.join([i for i in self.children if self._is_script(i)]))
             return f.getvalue()
         
     def render(self) -> str:
@@ -323,11 +324,12 @@ ElementType = TypeVar('ElementType', bound=Element)
 
 
 if __name__ == '__main__':
+    h = Element('head', children=[Element('meta', charset='utf-8')])
     b = Element('body', children=[
             Element('script', 'defer', src='/teste'),
             '<script src="/other" type="text/javascript">console.log(body)</script>',
             Element('main','hidden required .mymain #main',  children=Element('div', 'myid', children=[Element('h1', children='dia', styles=dict(font_size='12px', color='red'))])),
     ])
-    print(b)
-    print(dataclasses.asdict(b))
+    d = Element('html', children=[h, b])
+    print(d)
 
