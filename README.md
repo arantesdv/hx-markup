@@ -2,7 +2,7 @@
 
 --- 
 
-### BaseElement 
+### ElementBase 
 Base class for Style, Script or Element.
 
 ### Element TagEnum 
