@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hx-markup"
-version = "0.2.0"
+version = "0.2.1"
 description = "HTML markup using python classes, including HTMX language."
 authors = ["Daniel Arantes <arantesdv@me.com>"]
 license = "MIT"
