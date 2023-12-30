@@ -9,9 +9,12 @@ from collections import deque
 from typing import Optional, TypeVar
 
 from bs4 import BeautifulSoup
+from lxml import etree
+from lxml.builder import E
 
 from hx_markup import functions
 from hx_markup import enums
+
 
 
 @dataclasses.dataclass
@@ -28,6 +31,10 @@ class Render(ABC):
         if self.tag_enum.tagname == 'html':
             return self.bs4.prettify()
         return self.render()
+    
+    @property
+    def etree(self):
+        return etree.fromstring(self.render(), parser=etree.HTMLParser())
     
     @abstractmethod
     def render(self) -> str:...
@@ -83,6 +90,31 @@ class Render(ABC):
                 f.write(f'else {{{_else}}} ')
             return NodeText(f.getvalue())
 
+@dataclasses.dataclass(init=False)
+class BaseArgument(ABC):
+    data: str | ElementType | list[str | ElementType] | dict[str, str]
+    
+    def __init__(self, data: str | Render | list[str | Render] | dict[str, str]) -> None:
+        if isinstance(data, (list, dict)):
+            self.data = data
+        elif isinstance(data, (str, Render)):
+            self.data = [data]
+            
+    
+@dataclasses.dataclass(init=False)
+class After(BaseArgument):
+    data: str | ElementType | list[str | ElementType]
+    
+    
+@dataclasses.dataclass(init=False)
+class Before(BaseArgument):
+    data: str | ElementType | list[str | ElementType]
+
+
+@dataclasses.dataclass(init=False)
+class HTMX(BaseArgument):
+    data: dict[str, str]
+
 
 @dataclasses.dataclass
 class NodeTextBase(Render):
@@ -122,11 +154,11 @@ class Element(ElementBase):
     def __init__(self, tag: str, /, *args, **kwargs):
         self.tag = tag
         self._init_args(*args)
-        self.children = self._setup_deque(kwargs.pop('children', deque()))
-        self.after = self._setup_deque(kwargs.pop('after', deque()))
-        self.before = self._setup_deque(kwargs.pop('before', deque()))
+        self.children.extend(self._setup_deque(kwargs.pop('children', deque())))
+        self.after.extend(self._setup_deque(kwargs.pop('after', deque())))
+        self.before.extend(self._setup_deque(kwargs.pop('before', deque())))
+        self.htmx.update(kwargs.pop('htmx', {}))
         self.styles = kwargs.pop('styles', {})
-        self.htmx = kwargs.pop('htmx', {})
         self.dataset = kwargs.pop('dataset', {})
         self.keywords = kwargs
 
@@ -142,10 +174,18 @@ class Element(ElementBase):
             return children
 
     def _init_args(self, *args):
-        items, self.classlist, self.booleans = [], [], []
+        items, self.classlist, self.booleans, self.after, self.before, self.children, self.htmx = [], [], [], deque(), deque(), deque(), {}
         for item in args:
             if isinstance(item, str):
                 items.extend(item.split())
+            elif isinstance(item, Before):
+                self.before.extend(item.data)
+            elif isinstance(item, After):
+                self.after.extend(item.data)
+            elif isinstance(item, (NodeText, Element)):
+                self.children.append(item)
+            elif isinstance(item, HTMX):
+                self.htmx.update(**item.data)
         for item in functions.filter_uniques(items):
             if item.startswith('#'):
                 self.id = item[1:]
@@ -199,6 +239,11 @@ class Element(ElementBase):
     @staticmethod
     def _is_script(item):
         return any([isinstance(item, Element) and item.tag_enum.tagname == 'script', str(item).startswith('<script')])
+    
+    @staticmethod
+    def _is_style(item):
+        return any([isinstance(item, Element) and item.tag_enum.tagname == 'style', str(item).startswith('<style')])
+
 
     @property
     def render_children(self):
@@ -206,9 +251,10 @@ class Element(ElementBase):
             if self.tag_enum.tagname == 'script':
                 f.write('; '.join([str(i) for i in self.children]))
             elif self.tag_enum.tagname == 'style':
-                f.write(functions.join(self.children, sep="\n"))
+                f.write(functions.join(self.children, sep=" "))
             else:
-                f.write(functions.join([i for i in self.children if not self._is_script(i)]))
+                f.write(functions.join([i for i in self.children if self._is_style(i)]))
+                f.write(functions.join([i for i in self.children if all([not self._is_script(i), not self._is_style(i)])]))
                 f.write(functions.join([i for i in self.children if self._is_script(i)]))
             return f.getvalue()
         
@@ -216,30 +262,75 @@ class Element(ElementBase):
         with io.StringIO() as f:
             if self.before:
                 f.write(functions.join(self.before))
-            f.write(f'<{self.tag_enum.tagname}{self.render_config}>')
-            if not self.tag_enum.void:
+            if self.tag_enum.is_void:
+                f.write(f'<{self.tag_enum.tagname}{self.render_config}/>')
+            else:
+                f.write(f'<{self.tag_enum.tagname}{self.render_config}>')
                 f.write(self.render_children)
                 f.write(f'</{self.tag_enum.tagname}>')
             if self.after:
                 f.write(functions.join(self.after))
             return f.getvalue()
             
+            
 ElementType = TypeVar('ElementType', Element, NodeText)
 
 
-if __name__ == '__main__':
-    h = Element('head', children=[Element('meta', charset='utf-8')])
-    b = Element('body', children=[
-            Element('script', 'defer', src='/teste'),
-            Element('script', children=[
-                    Render.js_function('dateNow', statements=[Render.js_const('date', 'new Date()'), 'return date']),
-                    Render.js_function('dateToday', statements=[Render.js_const('date', 'new Date()'), 'return date']),
-                    
-                    NodeText('dateNow()')
-            ]),
-            Element('main','hidden required .mymain #main',  children=Element('div', 'myid', children=[Element('h1', children='dia', styles=dict(font_size='12px', color='red'))])),
-    ])
-    d = Element('html', children=[h, b])
-    print(d)
+@dataclasses.dataclass(init=False)
+class Head(Element):
+    def __init__(self, *args):
+        super().__init__('head', children=[*args])
+        
+        
+@dataclasses.dataclass(init=False)
+class Body(Element):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__('body', *args, **kwargs)
+        
 
+@dataclasses.dataclass(init=False)
+class Script(Element):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__('script', *args, **kwargs)
+        
+        
+@dataclasses.dataclass(init=False)
+class Style(Element):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__('style', *args, **kwargs)
+        
+        
+@dataclasses.dataclass(init=False)
+class Div(Element):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__('div', *args, **kwargs)
+        
+        
+@dataclasses.dataclass(init=False)
+class Nav(Element):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__('nav', *args, **kwargs)
+        
+        
+@dataclasses.dataclass(init=False)
+class Main(Element):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__('main', *args, **kwargs)
+        
+        
+@dataclasses.dataclass(init=False)
+class Footer(Element):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__('footer', *args, **kwargs)
+
+
+if __name__ == '__main__':
+    x = Element(
+            'html',
+            Before('<!doctype html>'),
+            Head(Element('link', rel='stylesheet', href='/static/css/main.css')),
+            Body(Element('header', Div('#daniel .bg', NodeText('boa noite'))), Footer('hidden'),
+                 HTMX({'get': '/'}), Style(NodeText('*{color: black}'), NodeText('html {padding: 0}'))))
+    print(x)
+    
 

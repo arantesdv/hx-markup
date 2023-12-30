@@ -62,6 +62,7 @@ class TagEnum(namedtuple('Tag', 'tagname void unique semantic structure headonly
     H5 = "h5", False, False, False, False, False, True, False, False, False, []
     H6 = "h6", False, False, False, False, False, True, False, False, False, []
     HEAD = "head", False, True, False, True, False, False, False, False, False, []
+    HEADER = "header", False, False, True, False, False, True, False, False, False, []
     HR = "hr", True, False, False, False, False, True, False, False, False, ['noshade', 'size', 'width']
     HTML = "html", False, True, False, True, False, False, False, False, False, []
     I = "i", False, False, False, False, False, True, False, False, True, []
@@ -167,4 +168,8 @@ class TagEnum(namedtuple('Tag', 'tagname void unique semantic structure headonly
     @property
     def html(self):
         return self.tagname == 'html'
+    
+    @property
+    def is_void(self):
+        return self.value.void
     

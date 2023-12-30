@@ -26,6 +26,10 @@ from dataclasses import fields
 from functools import partial
 from typing import Any, get_args, get_origin, Iterable, Literal, Optional, overload, TypeVar
 
+from lxml import etree
+from lxml.builder import E
+from lxml.etree import Element
+
 from hx_markup import config
 
 T = TypeVar('T')
@@ -374,3 +378,12 @@ def is_boolean_attr(attr: str) -> bool:
 
 def is_global_attr(attr: str) -> bool:
     return attr in config.GLOBAL_ATTRIBUTES
+
+
+def tounicode(element: Element) -> str:
+    if isinstance(element, Element):
+        return etree.tounicode(element)
+
+
+if __name__ == '__main__':
+    print(tounicode(E.h1('Hello World')))
